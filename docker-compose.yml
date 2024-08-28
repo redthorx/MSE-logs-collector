@@ -1,0 +1,58 @@
+services:
+
+  web-service:
+    image: nginx
+    volumes:
+    - ./nginx-conf:/etc/nginx/templates
+    - ./logs/access.log:/var/log/nginx/access.log
+    - letsencrypt:/etc/letsencrypt
+    - ./webdata:/usr/share/nginx/html
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file: "./env/nginx.env"
+    depends_on:
+      - certbot
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - ./webdata:/usr/share/nginx/html
+  
+  fluentd:
+    build:
+      context: ./fluentd
+    volumes:
+      - ./logs/access.log:/var/log/nginx/access.log
+      - ./fluentd/fluent.conf:/fluentd/etc/fluent.conf
+    env_file: "./env/fluentd.env"
+    depends_on:
+      - web-service
+      - minio
+    networks:
+      customnetwork:
+        ipv4_address: 172.20.0.10
+
+  
+  minio:
+    image: quay.io/minio/minio
+    volumes:
+      - ./minio/data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    env_file: "./env/minio.env"
+    command: server /data 
+    networks:
+      customnetwork:
+        ipv4_address: 172.20.0.11
+
+volumes:
+  letsencrypt:
+  
+networks:
+ customnetwork:
+  ipam:
+    config:
+    - subnet: 172.20.0.0/16
